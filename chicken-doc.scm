@@ -85,7 +85,7 @@
    (import (chicken condition))
    (import (chicken format))
    (import (chicken file) (chicken file posix))
-   (import (only (chicken platform) chicken-home feature?))
+   (import (only (chicken platform) include-path feature?))
    (import (only (chicken gc) set-finalizer!))
    (import (only (chicken io) read-line))
    (import (rename (only (chicken io) read-list)
@@ -592,20 +592,23 @@
             (if x
                 (lp (fx+ i 1) (cons x L) (fx- left 1))
                 (lp (fx+ i 1) L left)))))))
-(define (vector-copy v #!optional (start 0) (end (vector-length v)) (fill (void)))
-  ;; SRFI-43 vector-copy.  Why is vector-lib's implementation so verbose?
-  (let ((len (vector-length v)))
-    (when (> start end) (error 'vector-copy "start > end" start end))
-    (when (< start 0)   (error 'vector-copy "start < 0" start))
-    (when (> start len) (error 'copy-vec "start > len" start len))
-    (let ((c (make-vector (- end start))))
-      (let ((end (min end len)))
-        (let loop ((vi start)
-                   (ci 0))
-          (cond ((< vi end)
-                 (vector-set! c ci (vector-ref v vi))
-                 (loop (+ vi 1) (+ ci 1)))
-                (else c)))))))
+(cond-expand
+  ((not chicken-6)
+   (define (vector-copy v #!optional (start 0) (end (vector-length v)) (fill (void)))
+     ;; SRFI-43 vector-copy.  Why is vector-lib's implementation so verbose?
+     (let ((len (vector-length v)))
+       (when (> start end) (error 'vector-copy "start > end" start end))
+       (when (< start 0)   (error 'vector-copy "start < 0" start))
+       (when (> start len) (error 'copy-vec "start > len" start len))
+       (let ((c (make-vector (- end start))))
+         (let ((end (min end len)))
+           (let loop ((vi start)
+                      (ci 0))
+             (cond ((< vi end)
+                    (vector-set! c ci (vector-ref v vi))
+                    (loop (+ vi 1) (+ ci 1)))
+                   (else c))))))))
+  (else))
 
 ;; Like append-map, but caps returned list length at LIM, an integer.
 ;; Negative LIM means unlimited.  Also passes the remaining LIM to F
@@ -822,8 +825,15 @@
 ;; Return standard location of repository.  Does not
 ;; guarantee it exists.
 (define (locate-repository)
-  (or (get-environment-variable "CHICKEN_DOC_REPOSITORY")
-      (make-pathname (chicken-home) "chicken-doc")))
+  (let* ((candidates (get-environment-variable "CHICKEN_DOC_REPOSITORY"))
+         (candidates (if candidates
+                         (list candidates)
+                         (map (cut make-pathname <> "chicken-doc")
+                              (cond-expand
+                                (chicken-6 (include-path))
+                                (else (list (chicken-home))))))))
+    (or (find directory-exists? candidates)
+        (error 'locate-repository "no repositories found at" candidates))))
 
 ;; Open the repository found in the standard location
 ;; and set the current repository for the thread.
