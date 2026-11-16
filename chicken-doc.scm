@@ -74,7 +74,7 @@
    (import chicken-doc-text)
    ;; note: do not import chicken.csi yet
    )
-  (else
+  (else ;; chicken 6 here i presume
    (import (scheme base))
    (import (chicken base))
    (import (chicken irregex))
@@ -85,7 +85,8 @@
    (import (chicken condition))
    (import (chicken format))
    (import (chicken file) (chicken file posix))
-   (import (only (chicken platform) chicken-home feature?))
+   ;; chicken6 no longer defines chicken-home in chicken platform
+   (import (only (chicken platform) feature?)) 
    (import (only (chicken gc) set-finalizer!))
    (import (only (chicken io) read-line))
    (import (rename (only (chicken io) read-list)
@@ -818,6 +819,11 @@
 
 ;; Current repository for node lookup API.
 (define current-repository (make-parameter #f))
+
+;; fixup for chicken-home removed from chicken 6 (chicken platform) module
+(cond-expand
+  (chicken-6
+   (define (chicken-home) "/usr/local/share/chicken")))
 
 ;; Return standard location of repository.  Does not
 ;; guarantee it exists.
